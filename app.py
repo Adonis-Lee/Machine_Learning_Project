@@ -12,7 +12,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, classification_report
+    confusion_matrix, classification_report, roc_curve, auc,
+    precision_recall_curve, average_precision_score
 )
 
 # Sayfa Ayarları
@@ -23,7 +24,7 @@ st.markdown("This tool allows you to Train, Test and Evaluate ML models on any C
 
 
 # ============================================================================
-# HELPER FUNCTIONS FOR PERCEPTRON ENHANCEMENTS
+# HELPER FUNCTIONS FOR MODEL ENHANCEMENTS
 # ============================================================================
 
 def create_confusion_matrix_details(cm, class_names=None):
@@ -148,6 +149,113 @@ def plot_feature_scatter(X_test, y_test, y_pred, feature1, feature2, class_names
     ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     ax2.grid(True, alpha=0.3)
     
+    plt.tight_layout()
+    return fig
+
+
+def plot_roc_curve_mlp(y_test, y_proba, class_names=None, multi_class=False):
+    """
+    Plot ROC curve(s) for MLP model.
+    
+    Args:
+        y_test: True labels
+        y_proba: Predicted probabilities
+        class_names: Optional list of class names
+        multi_class: Whether this is multi-class classification
+        
+    Returns:
+        matplotlib figure
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    if multi_class:
+        # One-vs-rest approach for multi-class
+        n_classes = y_proba.shape[1]
+        for i in range(n_classes):
+            y_test_binary = (y_test == i).astype(int)
+            y_proba_binary = y_proba[:, i]
+            fpr, tpr, _ = roc_curve(y_test_binary, y_proba_binary)
+            roc_auc = auc(fpr, tpr)
+            label = class_names[i] if class_names is not None else f'Class {i}'
+            ax.plot(fpr, tpr, label=f'{label} (AUC = {roc_auc:.2f})')
+    else:
+        # Binary classification
+        y_proba_binary = y_proba[:, 1] if y_proba.shape[1] > 1 else y_proba[:, 0]
+        fpr, tpr, _ = roc_curve(y_test, y_proba_binary)
+        roc_auc = auc(fpr, tpr)
+        ax.plot(fpr, tpr, label=f'ROC Curve (AUC = {roc_auc:.2f})')
+    
+    ax.plot([0, 1], [0, 1], 'k--', label='Random Classifier')
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.set_title('ROC Curve')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    return fig
+
+
+def plot_pr_curve_mlp(y_test, y_proba, class_names=None, multi_class=False):
+    """
+    Plot Precision-Recall curve(s) for MLP model.
+    
+    Args:
+        y_test: True labels
+        y_proba: Predicted probabilities
+        class_names: Optional list of class names
+        multi_class: Whether this is multi-class classification
+        
+    Returns:
+        matplotlib figure
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    if multi_class:
+        # One-vs-rest approach for multi-class
+        n_classes = y_proba.shape[1]
+        for i in range(n_classes):
+            y_test_binary = (y_test == i).astype(int)
+            y_proba_binary = y_proba[:, i]
+            precision_curve, recall_curve, _ = precision_recall_curve(y_test_binary, y_proba_binary)
+            ap = average_precision_score(y_test_binary, y_proba_binary)
+            label = class_names[i] if class_names is not None else f'Class {i}'
+            ax.plot(recall_curve, precision_curve, label=f'{label} (AP = {ap:.2f})')
+    else:
+        # Binary classification
+        y_proba_binary = y_proba[:, 1] if y_proba.shape[1] > 1 else y_proba[:, 0]
+        precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_proba_binary)
+        ap = average_precision_score(y_test, y_proba_binary)
+        ax.plot(recall_curve, precision_curve, label=f'PR Curve (AP = {ap:.2f})')
+    
+    ax.set_xlabel('Recall')
+    ax.set_ylabel('Precision')
+    ax.set_title('Precision-Recall Curve')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    return fig
+
+
+def plot_loss_curve_mlp(model):
+    """
+    Plot loss curve for MLP model if available.
+    
+    Args:
+        model: Trained MLPClassifier model
+        
+    Returns:
+        matplotlib figure or None
+    """
+    loss_curve = getattr(model, 'loss_curve_', None)
+    if loss_curve is None:
+        return None
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(loss_curve, linewidth=2)
+    ax.set_xlabel('Iteration / Epoch')
+    ax.set_ylabel('Loss')
+    ax.set_title('Training Loss Curve')
+    ax.grid(True, alpha=0.3)
     plt.tight_layout()
     return fig
 
@@ -458,8 +566,225 @@ if uploaded:
                         else:
                             st.warning("⚠️ The Perceptron did not converge within the maximum number of iterations.")
             
+            # Special enhanced display for MLP
+            elif model_name == "Multilayer Perceptron (Backprop)":
+                # Create enhanced tabs for MLP
+                tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                    "📈 Metrics",
+                    "🟦 Confusion Matrix",
+                    "📊 Charts & Insights",
+                    "📉 Training Dynamics",
+                    "🔧 Model Details"
+                ])
+                
+                with tab1:
+                    st.write("### Key Performance Metrics")
+                    
+                    # Primary metrics in columns
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Accuracy", f"{accuracy_score(y_test, y_pred):.4f}")
+                    col2.metric("Precision (Weighted)", f"{precision_score(y_test, y_pred, average='weighted', zero_division=0):.4f}")
+                    col3.metric("Recall (Weighted)", f"{recall_score(y_test, y_pred, average='weighted', zero_division=0):.4f}")
+                    col4.metric("F1 Score (Weighted)", f"{f1_score(y_test, y_pred, average='weighted', zero_division=0):.4f}")
+                    
+                    st.divider()
+                    
+                    # Macro-averaged metrics
+                    st.write("### Macro-Averaged Metrics")
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Precision (Macro)", f"{precision_score(y_test, y_pred, average='macro', zero_division=0):.4f}")
+                    col2.metric("Recall (Macro)", f"{recall_score(y_test, y_pred, average='macro', zero_division=0):.4f}")
+                    col3.metric("F1 Score (Macro)", f"{f1_score(y_test, y_pred, average='macro', zero_division=0):.4f}")
+                    
+                    st.divider()
+                    
+                    # Full classification report
+                    st.write("### Detailed Classification Report (Text Format)")
+                    st.code(classification_report(y_test, y_pred, zero_division=0))
+                
+                with tab2:
+                    st.write("### Confusion Matrix Analysis")
+                    
+                    # Compute confusion matrices
+                    cm = confusion_matrix(y_test, y_pred)
+                    cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+                    
+                    # Standard and Normalized confusion matrices side by side
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write("**Standard Confusion Matrix**")
+                        fig_cm = plt.figure(figsize=(8, 6))
+                        sns.heatmap(
+                            cm,
+                            annot=True,
+                            fmt='d',
+                            cmap="Blues",
+                            xticklabels=class_names if class_names is not None else 'auto',
+                            yticklabels=class_names if class_names is not None else 'auto'
+                        )
+                        plt.xlabel('Predicted Label')
+                        plt.ylabel('True Label')
+                        plt.title('Confusion Matrix')
+                        plt.tight_layout()
+                        st.pyplot(fig_cm)
+                    
+                    with col2:
+                        st.write("**Normalized Confusion Matrix**")
+                        fig_cm_norm = plt.figure(figsize=(8, 6))
+                        sns.heatmap(
+                            cm_normalized,
+                            annot=True,
+                            fmt='.2f',
+                            cmap="Blues",
+                            xticklabels=class_names if class_names is not None else 'auto',
+                            yticklabels=class_names if class_names is not None else 'auto'
+                        )
+                        plt.xlabel('Predicted Label')
+                        plt.ylabel('True Label')
+                        plt.title('Normalized Confusion Matrix')
+                        plt.tight_layout()
+                        st.pyplot(fig_cm_norm)
+                    
+                    st.divider()
+                    
+                    # Confusion Matrix Details Table
+                    st.write("### Confusion Matrix Details")
+                    st.write("Breakdown of each cell in the confusion matrix:")
+                    cm_details = create_confusion_matrix_details(cm, class_names=class_names)
+                    st.dataframe(cm_details, use_container_width=True, hide_index=True)
+                
+                with tab3:
+                    st.write("### Per-Class Performance Metrics")
+                    
+                    # Get classification report as dictionary
+                    report_dict = classification_report(y_test, y_pred, zero_division=0, output_dict=True)
+                    
+                    # Per-class precision
+                    st.write("#### Per-Class Precision")
+                    fig_precision = plot_per_class_metrics(report_dict, metric_name='precision')
+                    if fig_precision:
+                        st.pyplot(fig_precision)
+                    
+                    st.divider()
+                    
+                    # Per-class recall
+                    st.write("#### Per-Class Recall")
+                    fig_recall = plot_per_class_metrics(report_dict, metric_name='recall')
+                    if fig_recall:
+                        st.pyplot(fig_recall)
+                    
+                    st.divider()
+                    
+                    # Per-class F1 score
+                    st.write("#### Per-Class F1 Score")
+                    fig_f1 = plot_per_class_metrics(report_dict, metric_name='f1-score')
+                    if fig_f1:
+                        st.pyplot(fig_f1)
+                    
+                    st.divider()
+                    
+                    # ROC and PR curves (if predict_proba available)
+                    try:
+                        if hasattr(model, 'predict_proba'):
+                            y_proba = model.predict_proba(X_test)
+                            multi_class = len(np.unique(y_test)) > 2
+                            
+                            st.write("#### ROC Curves")
+                            fig_roc = plot_roc_curve_mlp(y_test, y_proba, class_names=class_names, multi_class=multi_class)
+                            st.pyplot(fig_roc)
+                            
+                            st.divider()
+                            
+                            st.write("#### Precision-Recall Curves")
+                            fig_pr = plot_pr_curve_mlp(y_test, y_proba, class_names=class_names, multi_class=multi_class)
+                            st.pyplot(fig_pr)
+                        else:
+                            st.info("ROC and Precision-Recall curves not available (model does not support probability predictions)")
+                    except Exception as e:
+                        st.warning(f"Could not generate ROC/PR curves: {e}")
+                
+                with tab4:
+                    st.write("### Training Dynamics")
+                    
+                    # Loss curve
+                    loss_curve = getattr(model, 'loss_curve_', None)
+                    if loss_curve is not None:
+                        st.write("#### Training Loss Curve")
+                        fig_loss = plot_loss_curve_mlp(model)
+                        if fig_loss:
+                            st.pyplot(fig_loss)
+                        
+                        st.write(f"**Final Loss:** {loss_curve[-1]:.6f}")
+                        st.write(f"**Initial Loss:** {loss_curve[0]:.6f}")
+                        st.write(f"**Loss Reduction:** {((loss_curve[0] - loss_curve[-1]) / loss_curve[0] * 100):.2f}%")
+                    else:
+                        st.info("Loss curve not available. The model may not have stored training history.")
+                    
+                    # Convergence information
+                    st.divider()
+                    st.write("#### Convergence Information")
+                    n_iter = getattr(model, 'n_iter_', None)
+                    if n_iter is not None:
+                        st.metric("Number of Iterations", n_iter)
+                        max_iter = model.get_params().get('max_iter', 'N/A')
+                        st.metric("Maximum Iterations", max_iter)
+                        if isinstance(max_iter, int) and n_iter >= max_iter:
+                            st.warning("⚠️ Model reached maximum iterations limit.")
+                        else:
+                            st.success("✅ Model converged before reaching maximum iterations.")
+                    else:
+                        st.info("Iteration information not available.")
+                
+                with tab5:
+                    st.write("### Model Configuration")
+                    
+                    # Model parameters
+                    st.write("#### Model Hyperparameters")
+                    model_params = model.get_params()
+                    st.json(model_params)
+                    
+                    st.divider()
+                    
+                    # Training information
+                    st.write("#### Training Information")
+                    
+                    # Extract MLP-specific attributes
+                    n_iter = getattr(model, 'n_iter_', None)
+                    n_features = X.shape[1]
+                    n_classes = len(np.unique(y_test))
+                    hidden_layer_sizes = model.get_params().get('hidden_layer_sizes', ())
+                    n_layers = len(hidden_layer_sizes) + 2  # hidden layers + input + output
+                    total_hidden_units = sum(hidden_layer_sizes) if isinstance(hidden_layer_sizes, tuple) else 0
+                    
+                    info_data = {
+                        'Parameter': [
+                            'Training Time (seconds)',
+                            'Number of Iterations / Epochs',
+                            'Number of Layers',
+                            'Total Hidden Units',
+                            'Hidden Layer Architecture',
+                            'Input Feature Count',
+                            'Number of Classes',
+                            'Test Set Size'
+                        ],
+                        'Value': [
+                            f"{train_time:.4f}",
+                            f"{n_iter if n_iter is not None else 'N/A'}",
+                            f"{n_layers}",
+                            f"{total_hidden_units}",
+                            f"{hidden_layer_sizes}",
+                            f"{n_features}",
+                            f"{n_classes}",
+                            f"{len(y_pred)}"
+                        ]
+                    }
+                    
+                    info_df = pd.DataFrame(info_data)
+                    st.dataframe(info_df, use_container_width=True, hide_index=True)
+            
             else:
-                # Standard display for other models (MLP, Decision Tree)
+                # Standard display for Decision Tree
                 tab1, tab2, tab3 = st.tabs(["📈 Metrics", "🟦 Confusion Matrix", "🌳 Model Details"])
 
                 with tab1:
