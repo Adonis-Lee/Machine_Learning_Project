@@ -261,7 +261,7 @@ def create_model(model_name, hyperparams):
     Returns:
         Model instance
     """
-    if model_name == "Perceptron":
+        if model_name == "Perceptron":
         return Perceptron(
             penalty=hyperparams.get('penalty', 'l2'),
             alpha=hyperparams.get('alpha', 0.0001),
@@ -269,7 +269,7 @@ def create_model(model_name, hyperparams):
             fit_intercept=hyperparams.get('fit_intercept', True),
             random_state=42
         )
-    elif model_name == "Multilayer Perceptron (Backprop)":
+        elif model_name == "Multilayer Perceptron (Backprop)":
         return MLPClassifier(
             hidden_layer_sizes=hyperparams.get('hidden_layer_sizes', (100,)),
             activation=hyperparams.get('activation', 'relu'),
@@ -285,7 +285,7 @@ def create_model(model_name, hyperparams):
             min_samples_leaf=hyperparams.get('min_samples_leaf', 1),
             random_state=42
         )
-    else:
+        else:
         raise ValueError(f"Unknown model: {model_name}")
 
 
@@ -306,12 +306,12 @@ def train_model(model, X_train, y_train, X_test, y_test, model_name):
     """
     # Train model and measure time
     start_time = time.time()
-    model.fit(X_train, y_train)
+            model.fit(X_train, y_train)
     train_time = time.time() - start_time
     
     # Make predictions
-    y_pred = model.predict(X_test)
-    
+            y_pred = model.predict(X_test)
+
     # Compute metrics
     accuracy = accuracy_score(y_test, y_pred)
     precision_macro = precision_score(y_test, y_pred, average='macro', zero_division=0)
@@ -503,6 +503,132 @@ def plot_pr_curve(pr_data, multi_class=False):
     ax.set_title('Precision-Recall Curve')
     ax.legend()
     ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    return fig
+
+
+def create_confusion_matrix_details(cm, class_names=None):
+    """
+    Create a detailed confusion matrix breakdown table.
+    
+    Args:
+        cm: Confusion matrix array
+        class_names: Optional list of class names
+        
+    Returns:
+        DataFrame: Detailed confusion matrix breakdown
+    """
+    n_classes = cm.shape[0]
+    details = []
+    
+    for i in range(n_classes):
+        for j in range(n_classes):
+            true_label = class_names[i] if class_names is not None else f"Class {i}"
+            pred_label = class_names[j] if class_names is not None else f"Class {j}"
+            count = int(cm[i, j])
+            details.append({
+                'True Label': true_label,
+                'Predicted Label': pred_label,
+                'Count': count
+            })
+    
+    return pd.DataFrame(details)
+
+
+def plot_per_class_metrics(classification_report_dict, metric_name='precision'):
+    """
+    Plot per-class metrics as a bar chart.
+    
+    Args:
+        classification_report_dict: Dictionary from classification_report
+        metric_name: Name of metric to plot ('precision', 'recall', 'f1-score')
+        
+    Returns:
+        matplotlib figure
+    """
+    # Extract per-class metrics (exclude 'accuracy', 'macro avg', 'weighted avg')
+    classes = []
+    values = []
+    
+    for key, value in classification_report_dict.items():
+        if key not in ['accuracy', 'macro avg', 'weighted avg'] and isinstance(value, dict):
+            if metric_name in value:
+                classes.append(key)
+                values.append(value[metric_name])
+    
+    if len(classes) == 0:
+        return None
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bars = ax.bar(classes, values, color='steelblue', alpha=0.7)
+    
+    # Add value labels on bars
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height,
+                f'{height:.3f}',
+                ha='center', va='bottom')
+    
+    ax.set_xlabel('Class')
+    ax.set_ylabel(metric_name.capitalize())
+    ax.set_title(f'Per-Class {metric_name.capitalize()}')
+    ax.set_ylim([0, 1.1])
+    ax.grid(True, alpha=0.3, axis='y')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    return fig
+
+
+def plot_feature_scatter(X_test, y_test, y_pred, feature1, feature2, class_names=None):
+    """
+    Plot a scatter plot of two features colored by true and predicted labels.
+    
+    Args:
+        X_test: Test features DataFrame
+        y_test: True labels
+        y_pred: Predicted labels
+        feature1: Name of first feature
+        feature2: Name of second feature
+        class_names: Optional list of class names
+        
+    Returns:
+        matplotlib figure
+    """
+    if feature1 not in X_test.columns or feature2 not in X_test.columns:
+        return None
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    
+    # Get unique classes
+    unique_classes = np.unique(np.concatenate([y_test, y_pred]))
+    colors = plt.cm.Set3(np.linspace(0, 1, len(unique_classes)))
+    
+    # Plot true labels
+    for i, cls in enumerate(unique_classes):
+        mask = y_test == cls
+        label = class_names[cls] if class_names is not None else f"Class {cls}"
+        ax1.scatter(X_test.loc[mask, feature1], X_test.loc[mask, feature2],
+                   c=[colors[i]], label=label, alpha=0.6, s=50)
+    
+    ax1.set_xlabel(feature1)
+    ax1.set_ylabel(feature2)
+    ax1.set_title('True Labels')
+    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax1.grid(True, alpha=0.3)
+    
+    # Plot predicted labels
+    for i, cls in enumerate(unique_classes):
+        mask = y_pred == cls
+        label = class_names[cls] if class_names is not None else f"Class {cls}"
+        ax2.scatter(X_test.loc[mask, feature1], X_test.loc[mask, feature2],
+                   c=[colors[i]], label=label, alpha=0.6, s=50)
+    
+    ax2.set_xlabel(feature1)
+    ax2.set_ylabel(feature2)
+    ax2.set_title('Predicted Labels')
+    ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax2.grid(True, alpha=0.3)
+    
     plt.tight_layout()
     return fig
 
@@ -816,6 +942,11 @@ def main():
             X_processed, y_processed, test_size=test_size, random_state=42, stratify=y_processed
         )
         
+        # Store test data in session state for visualization
+        st.session_state.X_test = X_test
+        st.session_state.y_test = y_test
+        st.session_state.X_processed = X_processed
+        
         st.session_state.results = {}
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -910,113 +1041,340 @@ def main():
             st.divider()
             st.subheader(f"🔍 Results for: {model_name}")
             
-            # Create tabs for different views
-            tab1, tab2, tab3, tab4 = st.tabs([
-                "📈 Metrics",
-                "🟦 Confusion Matrices",
-                "📊 Curves",
-                "🌳 Model Details"
-            ])
-            
-            with tab1:
-                # Key Metrics
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Accuracy", f"{results['accuracy']:.4f}")
-                col2.metric("Precision (Weighted)", f"{results['precision_weighted']:.4f}")
-                col3.metric("Recall (Weighted)", f"{results['recall_weighted']:.4f}")
-                col4.metric("F1 Score (Weighted)", f"{results['f1_weighted']:.4f}")
+            # Special enhanced display for Perceptron
+            if model_name == "Perceptron":
+                # Create enhanced tabs for Perceptron
+                tab1, tab2, tab3, tab4 = st.tabs([
+                    "📈 Metrics",
+                    "🟦 Confusion Matrix",
+                    "📊 Charts & Insights",
+                    "🔧 Model Details"
+                ])
                 
-                st.divider()
-                
-                # Detailed Metrics
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Macro-Averaged Metrics:**")
-                    st.metric("Precision (Macro)", f"{results['precision_macro']:.4f}")
-                    st.metric("Recall (Macro)", f"{results['recall_macro']:.4f}")
-                    st.metric("F1 Score (Macro)", f"{results['f1_macro']:.4f}")
-                
-                with col2:
-                    st.write("**Training Information:**")
-                    st.metric("Training Time", f"{results['train_time']:.4f} seconds")
-                    st.metric("Test Set Size", f"{len(results['y_pred'])} samples")
-                
-                st.divider()
-                
-                # Classification Report
-                st.write("**Detailed Classification Report:**")
-                report_df = pd.DataFrame(results['classification_report']).transpose()
-                st.dataframe(report_df, use_container_width=True)
-                
-                # Text classification report
-                st.code(classification_report(
-                    y_test, results['y_pred'], zero_division=0
-                ))
-            
-            with tab2:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.write("**Confusion Matrix**")
-                    fig_cm = plot_confusion_matrix(
-                        results['confusion_matrix'],
-                        normalized=False,
-                        class_names=st.session_state.class_names
-                    )
-                    st.pyplot(fig_cm)
-                
-                with col2:
-                    st.write("**Normalized Confusion Matrix**")
-                    fig_cm_norm = plot_confusion_matrix(
-                        results['confusion_matrix_normalized'],
-                        normalized=True,
-                        class_names=st.session_state.class_names
-                    )
-                    st.pyplot(fig_cm_norm)
-            
-            with tab3:
-                if results['roc_data'] is not None:
-                    st.write("**ROC Curve**")
-                    multi_class = len(np.unique(y_test)) > 2
-                    fig_roc = plot_roc_curve(results['roc_data'], multi_class=multi_class)
-                    st.pyplot(fig_roc)
-                else:
-                    st.info("ROC curve not available (model does not support probability predictions)")
-                
-                if results['pr_data'] is not None:
-                    st.write("**Precision-Recall Curve**")
-                    multi_class = len(np.unique(y_test)) > 2
-                    fig_pr = plot_pr_curve(results['pr_data'], multi_class=multi_class)
-                    st.pyplot(fig_pr)
-                else:
-                    st.info("Precision-Recall curve not available (model does not support probability predictions)")
-            
-            with tab4:
-                st.write("**Model Parameters:**")
-                st.json(results['model'].get_params())
-                
-                if model_name == "Decision Tree":
-                    st.write("**Decision Tree Visualization:**")
-                    fig_tree, ax_tree = plt.subplots(figsize=(20, 10))
-                    plot_tree(
-                        results['model'],
-                        filled=True,
-                        feature_names=X_processed.columns,
-                        ax=ax_tree,
-                        max_depth=5,
-                        fontsize=8
-                    )
-                    st.pyplot(fig_tree)
+                with tab1:
+                    st.write("### Key Performance Metrics")
                     
-                    # Tree statistics
-                    st.write("**Tree Statistics:**")
-                    n_nodes = results['model'].tree_.node_count
-                    depth = results['model'].tree_.max_depth
-                    n_leaves = results['model'].tree_.n_leaves
+                    # Primary metrics in columns
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Accuracy", f"{results['accuracy']:.4f}")
+                    col2.metric("Precision (Weighted)", f"{results['precision_weighted']:.4f}")
+                    col3.metric("Recall (Weighted)", f"{results['recall_weighted']:.4f}")
+                    col4.metric("F1 Score (Weighted)", f"{results['f1_weighted']:.4f}")
+                    
+                    st.divider()
+                    
+                    # Macro-averaged metrics
+                    st.write("### Macro-Averaged Metrics")
                     col1, col2, col3 = st.columns(3)
-                    col1.metric("Number of Nodes", n_nodes)
-                    col2.metric("Max Depth", depth)
-                    col3.metric("Number of Leaves", n_leaves)
+                    col1.metric("Precision (Macro)", f"{results['precision_macro']:.4f}")
+                    col2.metric("Recall (Macro)", f"{results['recall_macro']:.4f}")
+                    col3.metric("F1 Score (Macro)", f"{results['f1_macro']:.4f}")
+                    
+                    st.divider()
+                    
+                    # Full classification report
+                    st.write("### Detailed Classification Report")
+                    report_df = pd.DataFrame(results['classification_report']).transpose()
+                    st.dataframe(report_df, use_container_width=True)
+                    
+                    st.write("### Classification Report (Text Format)")
+                    y_test_viz = st.session_state.get('y_test', None)
+                    if y_test_viz is not None:
+                        st.code(classification_report(
+                            y_test_viz, results['y_pred'], zero_division=0
+                        ))
+                
+                with tab2:
+                    st.write("### Confusion Matrix Analysis")
+                    
+                    # Standard and Normalized confusion matrices side by side
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write("**Standard Confusion Matrix**")
+                        fig_cm = plot_confusion_matrix(
+                            results['confusion_matrix'],
+                            normalized=False,
+                            class_names=st.session_state.class_names
+                        )
+                        st.pyplot(fig_cm)
+                    
+                    with col2:
+                        st.write("**Normalized Confusion Matrix**")
+                        fig_cm_norm = plot_confusion_matrix(
+                            results['confusion_matrix_normalized'],
+                            normalized=True,
+                            class_names=st.session_state.class_names
+                        )
+                        st.pyplot(fig_cm_norm)
+                    
+                    st.divider()
+                    
+                    # Confusion Matrix Details Table
+                    st.write("### Confusion Matrix Details")
+                    st.write("Breakdown of each cell in the confusion matrix:")
+                    cm_details = create_confusion_matrix_details(
+                        results['confusion_matrix'],
+                        class_names=st.session_state.class_names
+                    )
+                    st.dataframe(cm_details, use_container_width=True, hide_index=True)
+                
+                with tab3:
+                    st.write("### Per-Class Performance Metrics")
+                    
+                    # Per-class precision
+                    st.write("#### Per-Class Precision")
+                    fig_precision = plot_per_class_metrics(
+                        results['classification_report'],
+                        metric_name='precision'
+                    )
+                    if fig_precision:
+                        st.pyplot(fig_precision)
+                    
+                    st.divider()
+                    
+                    # Per-class recall
+                    st.write("#### Per-Class Recall")
+                    fig_recall = plot_per_class_metrics(
+                        results['classification_report'],
+                        metric_name='recall'
+                    )
+                    if fig_recall:
+                        st.pyplot(fig_recall)
+                    
+                    st.divider()
+                    
+                    # Per-class F1 score
+                    st.write("#### Per-Class F1 Score")
+                    fig_f1 = plot_per_class_metrics(
+                        results['classification_report'],
+                        metric_name='f1-score'
+                    )
+                    if fig_f1:
+                        st.pyplot(fig_f1)
+                    
+                    st.divider()
+                    
+                    # Feature scatter plot (optional)
+                    st.write("#### Feature Scatter Plot")
+                    st.write("Visualize how the Perceptron separates classes in feature space:")
+                    
+                    # Get numeric features for scatter plot
+                    X_processed_viz = st.session_state.get('X_processed', None)
+                    if X_processed_viz is not None:
+                        numeric_features = X_processed_viz.select_dtypes(include=[np.number]).columns.tolist()
+                    else:
+                        numeric_features = []
+                    
+                    if len(numeric_features) >= 2:
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            feature1 = st.selectbox(
+                                "Select First Feature",
+                                numeric_features,
+                                index=0,
+                                key=f'perceptron_feature1_{model_name}'
+                            )
+                        with col2:
+                            # Ensure feature2 is different from feature1
+                            feature2_options = [f for f in numeric_features if f != feature1]
+                            if len(feature2_options) > 0:
+                                feature2 = st.selectbox(
+                                    "Select Second Feature",
+                                    feature2_options,
+                                    index=0,
+                                    key=f'perceptron_feature2_{model_name}'
+                                )
+                                
+                                # Create scatter plot
+                                X_test_viz = st.session_state.get('X_test', None)
+                                y_test_viz = st.session_state.get('y_test', None)
+                                
+                                if X_test_viz is not None and y_test_viz is not None:
+                                    fig_scatter = plot_feature_scatter(
+                                        X_test_viz,
+                                        y_test_viz,
+                                        results['y_pred'],
+                                        feature1,
+                                        feature2,
+                                        class_names=st.session_state.class_names
+                                    )
+                                    if fig_scatter:
+                                        st.pyplot(fig_scatter)
+                                else:
+                                    st.warning("Test data not available for visualization")
+                            else:
+                                st.info("Not enough features available for scatter plot")
+                    else:
+                        st.info("Need at least 2 numeric features for scatter plot visualization")
+                
+                with tab4:
+                    st.write("### Model Configuration")
+                    
+                    # Model parameters
+                    st.write("#### Model Hyperparameters")
+                    model_params = results['model'].get_params()
+                    st.json(model_params)
+                    
+            st.divider()
+                    
+                    # Training information
+                    st.write("#### Training Information")
+                    
+                    # Extract Perceptron-specific attributes
+                    n_iter = getattr(results['model'], 'n_iter_', None)
+                    converged = getattr(results['model'], 'converged_', None)
+                    X_processed_viz = st.session_state.get('X_processed', None)
+                    n_features = X_processed_viz.shape[1] if X_processed_viz is not None else 'N/A'
+                    y_test_viz = st.session_state.get('y_test', None)
+                    n_classes = len(np.unique(y_test_viz)) if y_test_viz is not None else len(np.unique(results['y_pred']))
+                    
+                    info_data = {
+                        'Parameter': [
+                            'Training Time (seconds)',
+                            'Number of Iterations',
+                            'Convergence Status',
+                            'Input Feature Count',
+                            'Number of Classes',
+                            'Test Set Size'
+                        ],
+                        'Value': [
+                            f"{results['train_time']:.4f}",
+                            f"{n_iter[0] if n_iter is not None and len(n_iter) > 0 else 'N/A'}",
+                            f"{'Yes' if converged is not None and converged else 'N/A'}",
+                            f"{n_features}",
+                            f"{n_classes}",
+                            f"{len(results['y_pred'])}"
+                        ]
+                    }
+                    
+                    info_df = pd.DataFrame(info_data)
+                    st.dataframe(info_df, use_container_width=True, hide_index=True)
+                    
+                    # Additional details
+                    if n_iter is not None and len(n_iter) > 0:
+                        st.info(f"⚠️ The Perceptron required {n_iter[0]} iterations to converge (or reached max_iter limit).")
+                    if converged is not None:
+                        if converged:
+                            st.success("✅ The Perceptron converged successfully.")
+                        else:
+                            st.warning("⚠️ The Perceptron did not converge within the maximum number of iterations.")
+            
+            else:
+                # Standard display for other models (MLP, Decision Tree)
+                # Create tabs for different views
+                tab1, tab2, tab3, tab4 = st.tabs([
+                    "📈 Metrics",
+                    "🟦 Confusion Matrices",
+                    "📊 Curves",
+                    "🌳 Model Details"
+                ])
+
+            with tab1:
+                    # Key Metrics
+                col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Accuracy", f"{results['accuracy']:.4f}")
+                    col2.metric("Precision (Weighted)", f"{results['precision_weighted']:.4f}")
+                    col3.metric("Recall (Weighted)", f"{results['recall_weighted']:.4f}")
+                    col4.metric("F1 Score (Weighted)", f"{results['f1_weighted']:.4f}")
+                    
+                    st.divider()
+                    
+                    # Detailed Metrics
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write("**Macro-Averaged Metrics:**")
+                        st.metric("Precision (Macro)", f"{results['precision_macro']:.4f}")
+                        st.metric("Recall (Macro)", f"{results['recall_macro']:.4f}")
+                        st.metric("F1 Score (Macro)", f"{results['f1_macro']:.4f}")
+                    
+                    with col2:
+                        st.write("**Training Information:**")
+                        st.metric("Training Time", f"{results['train_time']:.4f} seconds")
+                        st.metric("Test Set Size", f"{len(results['y_pred'])} samples")
+                    
+                    st.divider()
+                    
+                    # Classification Report
+                    st.write("**Detailed Classification Report:**")
+                    report_df = pd.DataFrame(results['classification_report']).transpose()
+                    st.dataframe(report_df, use_container_width=True)
+                    
+                    # Text classification report
+                    y_test_viz = st.session_state.get('y_test', None)
+                    if y_test_viz is not None:
+                        st.code(classification_report(
+                            y_test_viz, results['y_pred'], zero_division=0
+                        ))
+
+            with tab2:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write("**Confusion Matrix**")
+                        fig_cm = plot_confusion_matrix(
+                            results['confusion_matrix'],
+                            normalized=False,
+                            class_names=st.session_state.class_names
+                        )
+                        st.pyplot(fig_cm)
+                    
+                    with col2:
+                        st.write("**Normalized Confusion Matrix**")
+                        fig_cm_norm = plot_confusion_matrix(
+                            results['confusion_matrix_normalized'],
+                            normalized=True,
+                            class_names=st.session_state.class_names
+                        )
+                        st.pyplot(fig_cm_norm)
+
+            with tab3:
+                    y_test_viz = st.session_state.get('y_test', None)
+                    if y_test_viz is not None:
+                        if results['roc_data'] is not None:
+                            st.write("**ROC Curve**")
+                            multi_class = len(np.unique(y_test_viz)) > 2
+                            fig_roc = plot_roc_curve(results['roc_data'], multi_class=multi_class)
+                            st.pyplot(fig_roc)
+                        else:
+                            st.info("ROC curve not available (model does not support probability predictions)")
+                        
+                        if results['pr_data'] is not None:
+                            st.write("**Precision-Recall Curve**")
+                            multi_class = len(np.unique(y_test_viz)) > 2
+                            fig_pr = plot_pr_curve(results['pr_data'], multi_class=multi_class)
+                            st.pyplot(fig_pr)
+                        else:
+                            st.info("Precision-Recall curve not available (model does not support probability predictions)")
+                
+                with tab4:
+                    st.write("**Model Parameters:**")
+                    st.json(results['model'].get_params())
+
+                if model_name == "Decision Tree":
+                        st.write("**Decision Tree Visualization:**")
+                        X_processed_viz = st.session_state.get('X_processed', None)
+                        if X_processed_viz is not None:
+                    fig_tree, ax_tree = plt.subplots(figsize=(20, 10))
+                            plot_tree(
+                                results['model'],
+                                filled=True,
+                                feature_names=X_processed_viz.columns,
+                                ax=ax_tree,
+                                max_depth=5,
+                                fontsize=8
+                            )
+                    st.pyplot(fig_tree)
+
+                            # Tree statistics
+                            st.write("**Tree Statistics:**")
+                            n_nodes = results['model'].tree_.node_count
+                            depth = results['model'].tree_.max_depth
+                            n_leaves = results['model'].tree_.n_leaves
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("Number of Nodes", n_nodes)
+                            col2.metric("Max Depth", depth)
+                            col3.metric("Number of Leaves", n_leaves)
 
 
 if __name__ == "__main__":
