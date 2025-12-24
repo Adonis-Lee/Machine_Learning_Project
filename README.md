@@ -433,6 +433,16 @@ This project is developed for academic purposes as part of the CENG465 Machine L
 
 Developed as part of CENG465 Machine Learning course project.
 
+### Team Members
+
+| Name | Student ID |
+|------|------------|
+| Melek Arslan | 220446018 |
+| Alp Doruk Şengün | 230444401 |
+| Mehmet Anıl Ülkü | 220441001 |
+| Yusuf Özoğul | 230446401 |
+| Saip Deniz İnal | 210444087 |
+
 ---
 
 **Note**: This toolkit is designed for educational and research purposes. The custom backpropagation implementation prioritizes clarity and educational value over raw performance.
